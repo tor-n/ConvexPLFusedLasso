@@ -460,13 +460,4 @@ class Tree():
             queue += node.children
         return list_s_int
     
-    def solve_lasso(self, lambda_value):
-        # get the optimal solution to the original fused lasso problem
 
-        if self.all_lambda_ranges is None:
-            print("HAVE NOT BUILT THE TREE! -- run fit() and fill_split() first")
-            return
-        
-        index = bisect.bisect_left(self.all_lambda_ranges, lambda_value)
-        
-        return
