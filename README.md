@@ -12,7 +12,7 @@ An example of a convex piecewise linear fused lasso is the following fused lasso
 
 ### Solving $\ell_1$-fidelity fused lasso
 
-We call the parameters $w$ and $a$ in [eq 1]  ''weights'' and ''breakpoints''. We use them as inputs to our solver.
+We call the parameters $w$ and $a$ in [eq 2]  ''weights'' and ''breakpoints''. We use them as inputs to our solver.
 
 ```{python}
 from tree_l1 import *
