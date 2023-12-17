@@ -101,8 +101,8 @@ class Tree():
             list_sol = [sol_e, sol_n, sol_r]
             list_const = [v_e, v_n, v_r]
         
-        list_th_lambda = self._pre_solve_lambda(list_multi, list_const) # threshold values of lambda, len(list_th_lambda) = len(list_sol)-1
-        list_new_sol, list_new_th, list_new_th_type = self._simplify_solution(list_sol[::-1], list_th_lambda) # condense cases where some solutions are never chosen
+        list_med_sol, list_th_lambda = self._pre_solve_lambda(list_sol, list_multi, list_const) # threshold values of lambda, len(list_th_lambda) = len(list_sol)-1
+        list_new_sol, list_new_th, list_new_th_type = self._simplify_solution(list_med_sol[::-1], list_th_lambda) # condense cases where some solutions are never chosen
         # we use the reverse of list sol as input because the list sol was first sorted according to the multiplier of lambda in each case in asecending order
         # however, the solution with larger multiplier is prefered for small lambda, so we have to reverse it
         
@@ -139,8 +139,8 @@ class Tree():
             list_sol = [sol_e, sol_n, sol_l]
             list_const = [v_e, v_n, v_l]
         
-        list_th_lambda = self._pre_solve_lambda(list_multi, list_const) # threshold values of lambda, len(list_th_lambda) = len(list_sol)-1
-        list_new_sol, list_new_th, list_new_th_type = self._simplify_solution(list_sol[::-1], list_th_lambda) # condense cases where some solutions are never chosen
+        list_med_sol, list_th_lambda = self._pre_solve_lambda(list_sol, list_multi, list_const) # threshold values of lambda, len(list_th_lambda) = len(list_sol)-1
+        list_new_sol, list_new_th, list_new_th_type = self._simplify_solution(list_med_sol[::-1], list_th_lambda) # condense cases where some solutions are never chosen
         # we use the reverse of list sol as input because the list sol was first sorted according to the multiplier of lambda in each case in asecending order
         # however, the solution with larger multiplier is prefered for small lambda, so we have to reverse it
 
@@ -225,14 +225,14 @@ class Tree():
             list_sol = [[sol_n, sol_e][np.argmin([v_n, v_e])], [sol_l, sol_r][np.argmin([v_l, v_r])], sol_b]
             list_const = [np.min([v_n, v_e]), np.min([v_l, v_r]), v_b]
 
-        list_th_lambda = self._pre_solve_lambda(list_multi, list_const) # threshold values of lambda, len(list_th_lambda) = len(list_sol)-1
-        list_new_sol, list_new_th, list_new_th_type = self._simplify_solution(list_sol[::-1], list_th_lambda) # condense cases where some solutions are never chosen
+        list_med_sol, list_th_lambda = self._pre_solve_lambda(list_sol, list_multi, list_const) # threshold values of lambda, len(list_th_lambda) = len(list_sol)-1
+        list_new_sol, list_new_th, list_new_th_type = self._simplify_solution(list_med_sol[::-1], list_th_lambda) # condense cases where some solutions are never chosen
         # we use the reverse of list sol as input because the list sol was first sorted according to the multiplier of lambda in each case in asecending order
         # however, the solution with larger multiplier is prefered for small lambda, so we have to reverse it
 
         return list_new_sol, list_new_th, list_new_th_type
 
-    def _pre_solve_lambda(self, list_multi_unsorted, list_const_unsorted):
+    def _pre_solve_lambda(self, list_sol, list_multi_unsorted, list_const_unsorted):
         # input: list_multi_sorted = list of multipliers of lambdas (such as [0,1,2] or [0,2,4])
         # list_const_unsorted = list of the constant part of the cost, the index must correspond to that in the multi list
         
@@ -248,20 +248,26 @@ class Tree():
         list_const = list_const_unsorted[sorted_indices]
         
         if len(list_multi) == 2:
-            return [(list_const[0]-list_const[1])/(list_multi[1]-list_multi[0])]
+            return list_sol, [(list_const[0]-list_const[1])/(list_multi[1]-list_multi[0])]
         elif len(list_multi) == 3:
-            lambda_max = np.max(((list_const[0]-list_const[1])/(list_multi[1]-list_multi[0]), (list_const[0]-list_const[2])/(list_multi[2]-list_multi[0])))
-            lambda_min = np.min(((list_const[0]-list_const[2])/(list_multi[2]-list_multi[0]), (list_const[1]-list_const[2])/(list_multi[2]-list_multi[1])))
-            return [lambda_min, lambda_max]
-        elif len(list_multi) == 4:
-            lambda_pre = self._pre_solve_lambda(list_multi[0:3], list_const[0:3])
-            ratios = [(list_const[i]-list_const[3])/(list_multi[3]-list_multi[i]) for i in range(3)]
-            if ratios[2] < lambda_pre[0]:
-                return [ratios[2], lambda_pre[0], lambda_pre[1]]
-            elif ratios[1] < lambda_pre[1]:
-                return [ratios[1], ratios[1], lambda_pre[1]]
+            ratio01 = (list_const[0]-list_const[1])/(list_multi[1]-list_multi[0])
+            ratio02 = (list_const[0]-list_const[2])/(list_multi[2]-list_multi[0])
+            ratio12 = (list_const[1]-list_const[2])/(list_multi[2]-list_multi[1])
+            if ratio02 > ratio01:
+                return [list_sol[0], list_sol[-1]], [ratio02]
             else:
-                return [ratios[2], ratios[2], ratios[2]]
+                return list_sol, [ratio12, ratio01]
+
+        elif len(list_multi) == 4:
+            list_sol_pre, lambda_pre = self._pre_solve_lambda(list_sol[0:3], list_multi[0:3], list_const[0:3])
+            if len(lambda_pre) == 1:
+                return self._pre_solve_lambda([list_sol[0], list_sol[2], list_sol[3]], [list_multi[0], list_multi[2], list_multi[3]], [list_const[0], list_const[2], list_const[3]])
+            else:
+                list_sol_pre2, lambda_pre2 = self._pre_solve_lambda(list_sol[1:], list_multi[1:], list_const[1:])
+                if len(lambda_pre2) == 1:
+                    return [list_sol[0], list_sol[1], list_sol[3]], [lambda_pre2[0], lambda_pre[-1]]
+                elif len(lambda_pre2) == 2 and lambda_pre2[1] == lambda_pre[0]:
+                    return list_sol, [lambda_pre2[0], lambda_pre[0], lambda_pre[1]]
     
     def _simplify_solution(self, list_sol, list_th_lambda):
         # here we also compare the cuts that result in the same obj value; we take the cut with maximal source set
@@ -460,4 +466,13 @@ class Tree():
             queue += node.children
         return list_s_int
     
+    def solve_lasso(self, lambda_value):
+        # get the optimal solution to the original fused lasso problem
 
+        if self.all_lambda_ranges is None:
+            print("HAVE NOT BUILT THE TREE! -- run fit() and fill_split() first")
+            return
+        
+        index = bisect.bisect_left(self.all_lambda_ranges, lambda_value)
+        
+        return
